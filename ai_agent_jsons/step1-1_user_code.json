@@ -1,0 +1,93 @@
+That's a fantastic addition. Incorporating human-in-the-loop steps is essential for creating workflows that can handle tasks requiring human judgment, authority, or specific real-world qualifications.
+
+We can absolutely accommodate this by adding a new step `type` to our plan called `human_intervention`.
+
+### New Step Type: `human_intervention`
+
+This type signifies that the execution must pause and assign a task to a person. The `details` for this step will describe who is needed and what they need to do.
+
+Here are the key fields for its `details` object:
+*   `required_role`: An array of strings specifying the qualifications or roles the person must have (e.g., `["doctor"]`, `["line_manager", "department_head"]`).
+*   `instructions`: Clear, natural language instructions for the human operator.
+*   `expected_input`: A description of the data or confirmation the system needs back from the human to proceed.
+
+### Fully Updated JSON Structure
+
+Here is the latest schema, now including the `human_intervention` type and its corresponding `details` structure.
+
+```json
+{
+  "// ... (prompt_analysis and identified_resources sections are unchanged) ...": "...",
+
+  "execution_plan": {
+    "execution_order": ["string (list of step_ids)"],
+    "steps": {
+      "step_id_as_key": {
+        "description": "string",
+        "type": "string (Enum: 'tool_call', 'code_generation', 'llm_knowledge', 'llm_reasoning', 'human_intervention')",
+        "provenance": { "...": "..." },
+        "details": {
+          
+          "// ... (other types as before) ...": "...",
+
+          "// if type is 'human_intervention'": {
+            "required_role": ["string (e.g., 'doctor', 'nurse', 'system_admin')"],
+            "instructions": "string (The task for the human to perform)",
+            "expected_input": "string (Description of the information the human should provide back)"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+### Example: Medical Review Scenario
+
+Let's imagine a prompt that requires a qualified professional's review.
+
+**User Prompt:** "Patient John Smith's latest lab results show elevated troponin levels. Fetch his chart and flag for medical review."
+
+The LLM could generate this plan:
+
+```json
+{
+  "prompt_analysis": {
+    "user_prompt": "Patient John Smith's latest lab results show elevated troponin levels. Fetch his chart and flag for medical review.",
+    "llm_summary": "The user wants to retrieve a patient's chart based on a critical lab result and then assign it to a qualified medical professional for review.",
+    "identified_intent": "medical_review_workflow"
+  },
+  "identified_resources": {
+    "apis": [ { "api_name": "EMR_API", "endpoint_suggestion": "/patients/john-smith/chart", "...": "..." } ],
+    "policies": [ { "policy_name": "HIPAA Data Handling", "description": "Patient data must be handled securely." } ]
+  },
+  "execution_plan": {
+    "execution_order": ["fetch_chart", "request_medical_review", "log_recommendation"],
+    "steps": {
+      "fetch_chart": {
+        "description": "Fetch John Smith's chart from the EMR system.",
+        "type": "tool_call",
+        "details": { "tool_name": "EMR_API.get_patient_chart", "parameters": { "patient_id": "john-smith" } }
+      },
+      "request_medical_review": {
+        "description": "Assign the chart and lab results to a doctor for review.",
+        "type": "human_intervention",
+        "details": {
+          "required_role": ["doctor", "cardiologist"],
+          "instructions": "Review patient John Smith's chart and recent lab results (Troponin elevated). Provide your assessment and recommended next steps.",
+          "expected_input": "A text summary of the assessment and a list of actions."
+        }
+      },
+      "log_recommendation": {
+        "description": "Log the doctor's recommendation to the patient's record.",
+        "type": "llm_reasoning",
+        "details": { "action": "summarization", "input_from_step": "request_medical_review" }
+      }
+    }
+  }
+}
+```
+
+With this addition, your structure is now incredibly robust, capable of orchestrating complex workflows that seamlessly blend automated tasks with essential human expertise.

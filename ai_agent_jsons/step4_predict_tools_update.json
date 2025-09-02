@@ -1,0 +1,140 @@
+# UNIFIED AGENT PLAN
+
+This document defines the complete, final JSON structure for a sophisticated AI agent's plan. It incorporates a multi-actor execution flow, provenance tracking, tool-gap identification, and deeply evaluatable, machine-readable success criteria.
+
+---
+
+### Final Schema Definition
+
+#### **Root Object**
+*   `prompt_context` (object): Contains the initial `user_prompt` and `enriched_context`.
+*   `execution_plan` (object): Contains the `execution_order` array and the `steps` dictionary.
+
+#### **Step Object**
+Each step in the `steps` dictionary contains:
+*   `description` (string): The goal of the step.
+*   `type` (string): Enum of `tool_call`, `llm_reasoning`, `human_intervention`, `no_tool_available`.
+*   `provenance` (object): Tracks the `source` ("llm", "user") and `status` ("original", "edited", "added").
+*   `rationale` (string): Why the step is necessary.
+*   `success_criteria` (object): A machine-readable definition of the conditions for the step's success.
+*   `details` (object): A flexible object whose contents depend on the step `type`.
+
+#### **Success Criteria Object**
+*   `evaluation_logic` (string): Enum of `"ALL"` or `"ANY"`.
+*   `conditions` (array of objects): A list of checks to perform on the step's output.
+
+#### **Condition Object Types**
+*   `{"type": "http_status_code", "operator": "...", "value": ...}`
+*   `{"type": "json_path_check", "json_path": "...", "operator": "...", "value": ...}`
+*   `{"type": "string_contains", "substring": "...", "case_sensitive": ...}`
+*   `{"type": "regex_match", "pattern": "..."}`
+*   `{"type": "semantic_check", "expected_meaning": "..."}`
+
+---
+
+### Final Example: "Code Red" Incident Response
+
+This example demonstrates the full, final schema in action.
+
+```json
+{
+  "prompt_context": {
+    "user_prompt": "Our VIP customer, 'Global Corp', has reported a critical outage of their production environment. They have an SLA that requires a response within 15 minutes. Initiate our 'Code Red' incident response protocol.",
+    "enriched_context": "Customer 'Global Corp' is on the 'Platinum' support tier. The 'Code Red' protocol document specifies immediate escalation to the on-call engineer and public status page updates."
+  },
+  "execution_plan": {
+    "execution_order": [
+      "step_01_alert",
+      "step_02_check_sla",
+      "step_03_draft_comm",
+      "step_04_human_approval",
+      "step_05_update_status"
+    ],
+    "steps": {
+      "step_01_alert": {
+        "description": "Immediately alert the on-call engineer about the critical incident.",
+        "type": "tool_call",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "The 'Code Red' protocol requires immediate engineer notification to meet the SLA.",
+        "success_criteria": {
+          "evaluation_logic": "ALL",
+          "conditions": [
+            { "type": "http_status_code", "operator": "equals", "value": 201 },
+            { "type": "json_path_check", "json_path": "$.incident.id", "operator": "exists" },
+            { "type": "json_path_check", "json_path": "$.incident.status", "operator": "equals", "value": "triggered" }
+          ]
+        },
+        "details": {
+          "tool_name": "pagerduty_trigger_incident",
+          "parameters": { "urgency": "high", "service_id": "PROD-ENVIRONMENT", "title": "Critical Outage Reported by VIP Customer: Global Corp" }
+        }
+      },
+      "step_02_check_sla": {
+        "description": "Verify the specific SLA details for 'Global Corp'.",
+        "type": "no_tool_available",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "A tool is needed to look up contract details, but one does not exist.",
+        "success_criteria": {
+          "evaluation_logic": "ALL",
+          "conditions": []
+        },
+        "details": {
+          "missing_capability": "A tool to retrieve customer SLA terms from the contracts database."
+        }
+      },
+      "step_03_draft_comm": {
+        "description": "Draft an initial communication for the public status page.",
+        "type": "llm_reasoning",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "The protocol requires public updates. The LLM can create a standardized draft for human review.",
+        "success_criteria": {
+          "evaluation_logic": "ALL",
+          "conditions": [
+            {
+              "type": "semantic_check",
+              "expected_meaning": "The output must be a professional, customer-facing message that acknowledges a critical outage, confirms it is being investigated, and does NOT promise a resolution time."
+            }
+          ]
+        },
+        "details": {
+          "prompt_template": "Draft a customer-facing status page update for a critical outage for 'Global Corp'. State that we are aware of the issue and are actively investigating. Do not promise an ETA.",
+          "input_from_steps": []
+        }
+      },
+      "step_04_human_approval": {
+        "description": "Get approval for the public communication before posting.",
+        "type": "human_intervention",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "All external communications during a 'Code Red' incident must be approved.",
+        "success_criteria": {
+          "evaluation_logic": "ALL",
+          "conditions": [
+            { "type": "json_path_check", "json_path": "$.approved", "operator": "equals", "value": true }
+          ]
+        },
+        "details": {
+          "required_role": ["Incident Commander", "Support Lead"],
+          "instructions": "Please review and approve the following draft for our public status page: [Output from step_03_draft_comm]",
+          "expected_output": "A JSON object with a single boolean key: {'approved': true/false}."
+        }
+      },
+      "step_05_update_status": {
+        "description": "Post the approved message to the public status page.",
+        "type": "tool_call",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "This tool executes the final step of the initial communication protocol.",
+        "success_criteria": {
+          "evaluation_logic": "ALL",
+          "conditions": [
+            { "type": "http_status_code", "operator": "equals", "value": 200 }
+          ]
+        },
+        "details": {
+          "tool_name": "statuspage_update",
+          "parameters": { "status": "investigating", "message": "[Output from step_04_human_approval]" }
+        }
+      }
+    }
+  }
+}
+```

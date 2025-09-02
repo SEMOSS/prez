@@ -1,0 +1,128 @@
+# Prompt Template: LLM Tool Selector
+
+This prompt is designed to be sent to the LLM. It gives it a role, a list of available tools with their descriptions and parameters, and a clear task to select the best tool and determine its arguments.
+
+---
+
+```text
+# ROLE & GOAL
+
+You are an expert "Tool Selector" agent. Your purpose is to analyze a user's task and, from a list of available tools, select the single best tool to accomplish that task. You must also determine the correct parameters to pass to the selected tool based on the user's request.
+
+# AVAILABLE TOOLS
+
+Here is a list of the available tools you can choose from. Each tool has a `name`, a `description` of what it does, and the `parameters` it accepts.
+
+'''json
+[
+  {
+    "name": "search_internal_documents",
+    "description": "Performs a semantic search over our internal library of project documents, technical specifications, and meeting notes. Best for finding information about project history, design decisions, and team knowledge.",
+    "parameters": {
+      "query": { "type": "string", "description": "The natural language search query." }
+    }
+  },
+  {
+    "name": "get_employee_profile",
+    "description": "Retrieves an employee's profile information from the HR database, including their name, department, and manager, given an employee email address.",
+    "parameters": {
+      "employee_email": { "type": "string", "description": "The email address of the employee to look up." }
+    }
+  },
+  {
+    "name": "create_jira_ticket",
+    "description": "Creates a new ticket in the Engineering project in Jira. Requires a title and a description.",
+    "parameters": {
+      "title": { "type": "string", "description": "The title of the Jira ticket." },
+      "description": { "type": "string", "description": "The detailed body of the Jira ticket." }
+    }
+  }
+]
+'''
+
+# TASK
+
+Given the user's task below, you must:
+1.  Analyze the task to understand the user's goal.
+2.  Review the list of available tools and their parameters.
+3.  Select the single best tool for the job.
+4.  Extract the required parameters from the user's task to pass to the tool.
+5.  If no tool is appropriate, the value for `selected_tool` should be `null`.
+6.  You MUST respond with a single, valid JSON object that conforms to the JSON Schema provided below. Do not add any text or explanations outside of the JSON object.
+
+# USER'S TASK
+
+[INSERT THE USER'S TASK/PROMPT HERE]
+```
+
+---
+
+### Formal JSON Output Schema
+
+This is the formal JSON Schema that the LLM's output must validate against.
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LLM Tool Selection Output",
+  "description": "Defines the structured output for the LLM Tool Selector, including the chosen tool and its parameters.",
+  "type": "object",
+  "required": [
+    "reasoning",
+    "selected_tool"
+  ],
+  "properties": {
+    "reasoning": {
+      "type": "string",
+      "description": "The LLM's step-by-step thought process for why it chose a specific tool and how it determined the parameters."
+    },
+    "selected_tool": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "The single best tool selected to accomplish the task. Null if no tool is appropriate.",
+      "required": [
+        "tool_name",
+        "rationale",
+        "parameters"
+      ],
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "description": "The unique name of the chosen tool, which must match a name from the available tools list."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "A concise justification for why this specific tool was chosen."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "The key-value parameters to be passed to the tool's function, extracted from the user's task.",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}
+```
+
+### Example Usage
+
+If the **User's Task** was: `"I think I found a bug in the checkout process. The final price is being calculated incorrectly."`
+
+The LLM would produce this JSON object:
+
+```json
+{
+  "reasoning": "The user is reporting a 'bug' and describing an issue with a 'checkout process'. The `create_jira_ticket` tool is the most appropriate for reporting bugs. I will extract the core issue to use as the title and use the full user request as the description for the ticket.",
+  "selected_tool": {
+    "tool_name": "create_jira_ticket",
+    "rationale": "This tool is designed for creating bug reports and other tickets in the engineering team's tracking system.",
+    "parameters": {
+      "title": "Bug in Checkout Price Calculation",
+      "description": "The user reported that the final price in the checkout process is being calculated incorrectly."
+    }
+  }
+}
+```

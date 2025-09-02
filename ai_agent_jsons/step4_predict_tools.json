@@ -1,0 +1,150 @@
+This document defines the complete, unified JSON structure for an AI agent's plan, incorporating resource identification, a multi-actor execution plan, and provenance tracking.
+
+---
+
+### Unified Agent Plan Schema
+
+#### **Root Object Structure**
+
+*   **`prompt_context`**
+    *   **Type:** `object`
+    *   **Description:** Contains the initial inputs for the plan.
+    *   **Fields:**
+        *   `user_prompt`: (string) The original, verbatim prompt from the user.
+        *   `enriched_context`: (string) A summary of additional information relevant to the prompt.
+
+*   **`execution_plan`**
+    *   **Type:** `object`
+    *   **Description:** The core, step-by-step plan, designed to be easily editable.
+    *   **Fields:**
+        *   `execution_order`: (array of strings) An ordered list of `step_id`s.
+        *   `steps`: (object) A dictionary mapping each `step_id` to its detailed step object.
+
+---
+
+#### **Step Object Structure**
+
+Each object within the `steps` dictionary is defined as follows:
+
+*   **`description`**
+    *   **Type:** `string`
+    *   **Description:** A high-level, human-readable description of this step's goal.
+
+*   **`type`**
+    *   **Type:** `string` (Enum)
+    *   **Description:** The type of action required for this step.
+    *   **Values:** `tool_call`, `llm_reasoning`, `human_intervention`, `no_tool_available`
+
+*   **`provenance`**
+    *   **Type:** `object`
+    *   **Description:** Tracks the origin and modification history of the step.
+    *   **Fields:**
+        *   `source`: (string, Enum: `"llm"`, `"user"`)
+        *   `status`: (string, Enum: `"original"`, `"edited"`, `"added"`)
+
+*   **`rationale`**
+    *   **Type:** `string`
+    *   **Description:** A justification explaining why this step is necessary.
+
+*   **`details`**
+    *   **Type:** `object`
+    *   **Description:** A flexible object whose structure depends on the `type` of the step.
+
+---
+
+#### **`details` Object Structure (by `type`)**
+
+*   **If `type` is `tool_call`:**
+    *   `tool_name`: (string)
+    *   `parameters`: (object)
+    *   `tool_description`: (string)
+
+*   **If `type` is `llm_reasoning`:**
+    *   `prompt_template`: (string)
+    *   `input_from_steps`: (array of strings)
+
+*   **If `type` is `human_intervention`:**
+    *   `required_role`: (array of strings)
+    *   `instructions`: (string)
+    *   `expected_output`: (string)
+
+*   **If `type` is `no_tool_available`:**
+    *   `missing_capability`: (string)
+    *   `suggested_tool_description`: (string)
+
+---
+
+### Final Example: "Code Red" Incident Response
+
+```json
+{
+  "prompt_context": {
+    "user_prompt": "Our VIP customer, 'Global Corp', has reported a critical outage of their production environment. They have an SLA that requires a response within 15 minutes. Initiate our 'Code Red' incident response protocol.",
+    "enriched_context": "Customer 'Global Corp' is on the 'Platinum' support tier. The 'Code Red' protocol document specifies immediate escalation to the on-call engineer and public status page updates."
+  },
+  "execution_plan": {
+    "execution_order": [
+      "step_01_alert",
+      "step_02_check_sla",
+      "step_03_draft_comm",
+      "step_04_human_approval",
+      "step_05_update_status"
+    ],
+    "steps": {
+      "step_01_alert": {
+        "description": "Immediately alert the on-call engineer about the critical incident.",
+        "type": "tool_call",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "The 'Code Red' protocol requires immediate engineer notification to meet the SLA.",
+        "details": {
+          "tool_name": "pagerduty_trigger_incident",
+          "parameters": { "urgency": "high", "service_id": "PROD-ENVIRONMENT", "title": "Critical Outage Reported by VIP Customer: Global Corp" },
+          "tool_description": "Triggers a new incident in PagerDuty to alert the on-call engineer."
+        }
+      },
+      "step_02_check_sla": {
+        "description": "Verify the specific SLA details for 'Global Corp'.",
+        "type": "no_tool_available",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "A tool is needed to look up contract details, but one does not exist.",
+        "details": {
+          "missing_capability": "A tool to retrieve customer SLA terms from the contracts database.",
+          "suggested_tool_description": "A tool named `get_customer_sla` that takes a `customer_name` and returns their support tier and response time requirements."
+        }
+      },
+      "step_03_draft_comm": {
+        "description": "Draft an initial communication for the public status page.",
+        "type": "llm_reasoning",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "The protocol requires public updates. The LLM can create a standardized draft for human review.",
+        "details": {
+          "prompt_template": "Draft a customer-facing status page update for a critical outage for 'Global Corp'. State that we are aware of the issue and are actively investigating. Do not promise an ETA.",
+          "input_from_steps": []
+        }
+      },
+      "step_04_human_approval": {
+        "description": "Get approval for the public communication before posting.",
+        "type": "human_intervention",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "All external communications during a 'Code Red' incident must be approved.",
+        "details": {
+          "required_role": ["Incident Commander", "Support Lead"],
+          "instructions": "Please review and approve the following draft for our public status page: [Output from step_03_draft_comm]",
+          "expected_output": "A boolean 'true' for approval or a string with requested changes."
+        }
+      },
+      "step_05_update_status": {
+        "description": "Post the approved message to the public status page.",
+        "type": "tool_call",
+        "provenance": { "source": "llm", "status": "original" },
+        "rationale": "This tool executes the final step of the initial communication protocol.",
+        "details": {
+          "tool_name": "statuspage_update",
+          "parameters": { "status": "investigating", "message": "[Output from step_04_human_approval]" },
+          "tool_description": "Updates the company's public status page with a new incident."
+        }
+      }
+    }
+  }
+}
+```
