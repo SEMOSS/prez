@@ -2186,6 +2186,137 @@ Expecting `+Ze.join(", ")+", got '"+(this.terminals_[Pe]||Pe)+"'":At="Parse erro
                 </div>
             </section>
 
+            <section>
+                <h2>Clarifying Ambiguity</h2>
+                <p>Often, a user's initial prompt is not complete or comprehensive. To understand the full scope of what the user is trying to do, it's essential to ask clarifying questions. This ensures that the final output meets the user's actual needs and avoids making incorrect assumptions.</p>
+            </section>
+
+            <section>
+                <h2>enrich_prompt.json</h2>
+                <pre><code class="json" style="max-height: 80vh; overflow-y: auto;">
+# ROLE & GOAL
+
+You are an expert Requirements Analyst. Your purpose is to analyze an ambiguous user request. You can either generate a concise set of clarifying questions to gather necessary information, or, if the request allows, you can make reasonable assumptions, state them, and answer the prompt directly. Your goal is to be as helpful as possible, avoiding unnecessary questions for simple tasks while ensuring accuracy for complex ones.
+
+# TASK
+
+1.  **Analyze the User's Prompt:** Read the prompt and identify all implicit assumptions, missing variables, and areas of ambiguity.
+2.  **Decide Path:**
+    *   **If the prompt is simple and you can make a reasonable, low-risk assumption:** Proceed to the "Assumptions" path.
+    *   **If the prompt is complex, ambiguous, or requires user input:** Proceed to the "Clarification" path.
+3.  **Path 1: Clarification:**
+    *   Formulate a list of clear, targeted questions to ask the user.
+    *   Prioritize the questions logically.
+    *   Generate a JSON object with the `clarifying_questions` array populated.
+4.  **Path 2: Assumptions:**
+    *   Clearly state the assumption(s) you are making.
+    *   Provide a direct answer to the user's prompt based on your assumption(s).
+    *   Generate a JSON object with the `assumptions` array populated.
+5.  **Generate JSON:** Your output MUST be a single, valid JSON object that conforms to the schema below.
+
+# OUTPUT SCHEMA
+
+'''json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Clarification and Assumption Response",
+  "description": "A structured response that either asks clarifying questions or provides an answer based on stated assumptions.",
+  "type": "object",
+  "required": ["ambiguity_summary"],
+  "properties": {
+    "ambiguity_summary": {
+      "type": "string",
+      "description": "A brief, one-sentence explanation of why the original prompt is incomplete or a summary of the action taken."
+    },
+    "clarifying_questions": {
+      "type": "array",
+      "description": "An ordered list of questions to ask the user. This should be omitted if making assumptions.",
+      "items": {
+        "type": "object",
+        "required": ["question_key", "question_text"],
+        "properties": {
+          "question_key": { "type": "string" },
+          "question_text": { "type": "string" }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "A list of assumptions made to answer the prompt directly. This should be omitted if asking clarifying questions.",
+      "items": {
+        "type": "object",
+        "required": ["assumption_made", "answer_provided"],
+        "properties": {
+          "assumption_made": { "type": "string", "description": "The assumption made by the AI." },
+          "answer_provided": { "type": "string", "description": "The direct answer to the user's prompt based on the assumption." }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "required": ["clarifying_questions"] },
+    { "required": ["assumptions"] }
+  ]
+}
+'''
+ONLY provide the json. Do not provide the schema. 
+
+
+# --- CURRENT REQUEST ---
+
+**User Prompt:**
+`Who is current president of united states`
+
+
+# --- EXAMPLES ---
+
+# EXAMPLE 1 (Clarification)
+**User Prompt:** "What should I make for dinner?"
+
+**Your JSON Output:**
+'''json
+{
+  "ambiguity_summary": "The request is missing personal preferences and constraints needed for a relevant recipe suggestion.",
+  "clarifying_questions": [
+    {
+      "question_key": "dietary_restrictions",
+      "question_text": "Do you have any dietary preferences or restrictions (e.g., vegetarian, gluten-free)?"
+    },
+    {
+      "question_key": "cuisine_preference",
+      "question_text": "Are you in the mood for any particular type of cuisine?"
+    }
+  ]
+}
+'''
+
+# EXAMPLE 2 (Assumption)
+**User Prompt:** "how can I edit my videos"
+
+**Your JSON Output:**
+'''json
+{
+  "ambiguity_summary": "Assuming you are looking for free, easy-to-use video editing software for a desktop computer.",
+  "assumptions": [
+    {
+      "assumption_made": "The user is looking for free software.",
+      "answer_provided": "You can use free video editing software like DaVinci Resolve, Kdenlive, or Shotcut. They are powerful and available for Windows, Mac, and Linux."
+    },
+    {
+      "assumption_made": "The user is a beginner.",
+      "answer_provided": "For beginners, I recommend starting with something like Clipchamp which is built into Windows, or iMovie on a Mac. They have very simple interfaces to get you started."
+    }
+  ]
+}
+'''
+
+# --- CURRENT REQUEST ---
+
+**User Prompt:**
+`how can I edit my videos`
+                </code></pre>
+            </section>
+
             <section id="slide-1">
                 <h1>The "Everything" App</h1>
                 <h3>Using Playground to build the app you want accretively</h3>
